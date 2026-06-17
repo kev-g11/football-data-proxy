@@ -1,33 +1,28 @@
 export default async function handler(req, res) {
-  try {
-    const status = req.query.status || "LIVE"
-
-    const response = await fetch(
-      `https://api.football-data.org/v4/matches?status=${status}`,
-      {
-        headers: {
-          "X-Auth-Token": process.env.FOOTBALL_DATA_TOKEN,
-        },
-      }
-    )
-
-    const data = await response.json()
-
-    res.setHeader(
-      "X-Requests-Available",
-      response.headers.get("X-Requests-Available") || ""
-    )
-
-    res.setHeader(
-      "X-RequestCounter-Reset",
-      response.headers.get("X-RequestCounter-Reset") || ""
-    )
-
-    res.status(response.status).json(data)
-  } catch (error) {
-    res.status(500).json({
-      error: "Failed to fetch matches",
-      message: error.message,
-    })
+  // Allow requests from your Framer site
+  res.setHeader("Access-Control-Allow-Origin", "*")
+  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS")
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type")
+  if (req.method === "OPTIONS") {
+    return res.status(200).end()
   }
+  // Forward any query params (status, dateFrom, dateTo, etc.)
+  const params = new URLSearchParams(req.query)
+  const url = `https://api.football-data.org/v4/matches?${params}`
+  const response = await fetch(url, {
+    headers: { "X-Auth-Token": "30795c549d0b4ef78ad135a82817ceb0" }
+  })
+  const data = await response.json()
+  // Forward rate-limit headers to the client
+  for (const header of [
+    "X-RateLimit-Remaining",
+    "X-RateLimit-Reset",
+    "X-Requests-Available-Minute",
+    "X-RequestCounter-Reset"
+  ]) {
+    if (response.headers.get(header)) {
+      res.setHeader(header, response.headers.get(header))
+    }
+  }
+  res.status(response.status).json(data)
 }
